@@ -58,7 +58,11 @@ class App {
    * Sets up the drag-and-drop controller.
    */
   createDropzone () {
-    console.log("---->createDropzone:可以在这里加gltf 解析成file ");
+    console.log("from app.js 这里是关键 ---->createDropzone:可以在这里加gltf 解析成file ");
+    //add by hao 
+   // this.view("from_url", rootPath, fileMap);
+
+
     const dropCtrl = new SimpleDropzone(this.dropEl, this.inputEl);
     dropCtrl.on('drop', ({files}) => this.load(files));
     dropCtrl.on('dropstart', () => this.showSpinner());

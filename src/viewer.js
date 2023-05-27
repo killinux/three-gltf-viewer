@@ -181,7 +181,8 @@ export class Viewer {
   load ( url, rootPath, assetMap ) {
 
     const baseURL = LoaderUtils.extractUrlBase(url);
-
+    console.log("from viewer.js----->");
+    console.log("from viewer.js----->url:"+url);
     // Load.
     return new Promise((resolve, reject) => {
 
@@ -213,9 +214,11 @@ export class Viewer {
         .setMeshoptDecoder( MeshoptDecoder );
 
       const blobURLs = [];
-
+      //add by hao 改了这里 就可以直接加载指定的模型了
+      url="./model/tiny_house.glb";
       loader.load(url, (gltf) => {
 
+        console.log("from viewer.js loader.load----->"+url);
         window.VIEWER.json = gltf;
 
         const scene = gltf.scene || gltf.scenes[0];
