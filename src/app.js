@@ -58,6 +58,7 @@ class App {
    * Sets up the drag-and-drop controller.
    */
   createDropzone () {
+    console.log("---->createDropzone:可以在这里加gltf 解析成file ");
     const dropCtrl = new SimpleDropzone(this.dropEl, this.inputEl);
     dropCtrl.on('drop', ({files}) => this.load(files));
     dropCtrl.on('dropstart', () => this.showSpinner());
@@ -73,6 +74,8 @@ class App {
     this.viewerEl.classList.add('viewer');
     this.dropEl.innerHTML = '';
     this.dropEl.appendChild(this.viewerEl);
+    console.log("-------->createViewer");
+    console.log(this.viewerEl);
     this.viewer = new Viewer(this.viewerEl, this.options);
     return this.viewer;
   }
@@ -82,10 +85,13 @@ class App {
    * @param  {Map<string, File>} fileMap
    */
   load (fileMap) {
+    console.log("------>load");
+    console.log(fileMap);
     let rootFile;
     let rootPath;
     Array.from(fileMap).forEach(([path, file]) => {
       if (file.name.match(/\.(gltf|glb)$/)) {
+        
         rootFile = file;
         rootPath = path.replace(file.name, '');
       }
@@ -94,7 +100,8 @@ class App {
     if (!rootFile) {
       this.onError('No .gltf or .glb asset found.');
     }
-
+    console.log("load-------->rootFile:"+rootFile+",rootPath:"+rootPath+",fileMap:"+fileMap);
+    console.log(rootFile);
     this.view(rootFile, rootPath, fileMap);
   }
 
@@ -114,6 +121,7 @@ class App {
       ? rootFile
       : URL.createObjectURL(rootFile);
 
+      console.log("fileURL:"+fileURL);
     const cleanup = () => {
       this.hideSpinner();
       if (typeof rootFile === 'object') URL.revokeObjectURL(fileURL);
@@ -160,7 +168,6 @@ document.body.innerHTML += Footer();
 document.addEventListener('DOMContentLoaded', () => {
 
   const app = new App(document.body, location);
-
   window.VIEWER.app = app;
 
   console.info('[glTF Viewer] Debugging data exported as `window.VIEWER`.');

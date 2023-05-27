@@ -3,6 +3,7 @@ girl1: downloadable_girl_01.zip
 girl2: downloadable_girl_02.zip
 girl3: downloadable_girl_03.zip
 飞机： stylized_ww1_plane.zip
+小房子：tiny_house.glb
 
 
 
