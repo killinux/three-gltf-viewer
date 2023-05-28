@@ -59,10 +59,10 @@ class App {
    * Sets up the drag-and-drop controller.
    */
   createDropzone () {
-    console.log("from loadgltf.js 这里是关键 ---->createDropzone:可以在这里加gltf 解析成file ");
+    //console.log("from loadgltf.js 这里是关键 ---->createDropzone:可以在这里加gltf 解析成file ");
     //add by hao 
-   // this.view("from_url", rootPath, fileMap);
-    if(window.is_loadgltf_at_start==true){//add by hao
+    //this.view("from_url", rootPath, fileMap);
+    if(window.is_loadgltf_at_start==true){//add by hao 直接加载gltf
       this.appload("");
     }
     
@@ -82,8 +82,8 @@ class App {
     this.viewerEl.classList.add('viewer');
     this.dropEl.innerHTML = '';
     this.dropEl.appendChild(this.viewerEl);
-    console.log("-------->createViewer");
-    console.log(this.viewerEl);
+    //console.log("-------->createViewer");
+    //console.log(this.viewerEl);
     this.viewer = new Viewer(this.viewerEl, this.options);
     return this.viewer;
   }
@@ -94,11 +94,10 @@ class App {
    */
   //load (fileMap) {
   appload (fileMap) {
-    console.log("------>load");
-    console.log(fileMap);
     if(window.is_loadgltf_at_start==true){ //add by hao 
-      console.log("fileMap is null");
-      this.view("./model/tiny_house.glb", "", "");
+      const this_url="./model/tiny_house.glb";
+      console.log("from loadgltf.js, ----->appload, this_url:"+this_url);
+      this.view(this_url, "", "");
     }else{
       let rootFile;
       let rootPath;
@@ -130,16 +129,9 @@ class App {
     if (this.viewer) this.viewer.clear();
 
     const viewer = this.viewer || this.createViewer();
-    
-
-    if(rootFile=="no_url"){
-
-    }
     const fileURL = typeof rootFile === 'string'
       ? rootFile
       : URL.createObjectURL(rootFile);
-
-    console.log("loadgltf.js fileURL:"+fileURL);
     const cleanup = () => {
       this.hideSpinner();
       if (typeof rootFile === 'object') URL.revokeObjectURL(fileURL);
@@ -150,7 +142,7 @@ class App {
       .catch((e) => this.onError(e))
       .then((gltf) => {
         if (!this.options.kiosk) {
-          console.log("viewr.load validate--->");
+          //console.log("viewr.load validate--->");
           this.validator.validate(fileURL, rootPath, fileMap, gltf);
         }
         cleanup();

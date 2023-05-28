@@ -181,8 +181,7 @@ export class Viewer {
   load ( url, rootPath, assetMap ) {
 
     const baseURL = LoaderUtils.extractUrlBase(url);
-    console.log("from viewer.js----->");
-    console.log("from viewer.js----->url:"+url);
+    //console.log("from viewer.js----->url:"+url);//add by hao
     // Load.
     return new Promise((resolve, reject) => {
 
@@ -197,7 +196,7 @@ export class Viewer {
           .replace(/^(\.?\/)/, '');
 
         //if (assetMap.has(normalizedURL)) {
-        if (assetMap!="" && assetMap.has(normalizedURL)) {//modify by hao
+        if (assetMap!="" && assetMap.has(normalizedURL)) {//modify by hao ，如果assetMap 为空就不需要往后走了
           const blob = assetMap.get(normalizedURL);
           const blobURL = URL.createObjectURL(blob);
           blobURLs.push(blobURL);
@@ -218,8 +217,7 @@ export class Viewer {
       //add by hao 改了这里 就可以直接加载指定的模型了
       //url="./model/tiny_house.glb";
       loader.load(url, (gltf) => {
-
-        console.log("from viewer.js loader.load----->"+url);
+        //console.log("from viewer.js loader.load----->"+url);//add by hao
         window.VIEWER.json = gltf;
 
         const scene = gltf.scene || gltf.scenes[0];
