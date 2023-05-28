@@ -5,6 +5,7 @@ import { Validator } from './validator.js';
 import { Footer } from './components/footer';
 import queryString from 'query-string';
 
+window.is_loadgltf_at_start = true;//add by hao for start load gltf
 window.VIEWER = {};
 
 if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
@@ -58,8 +59,16 @@ class App {
    * Sets up the drag-and-drop controller.
    */
   createDropzone () {
+    console.log("from loadgltf.js 这里是关键 ---->createDropzone:可以在这里加gltf 解析成file ");
+    //add by hao 
+   // this.view("from_url", rootPath, fileMap);
+    if(window.is_loadgltf_at_start==true){//add by hao
+      this.appload("");
+    }
+    
+
     const dropCtrl = new SimpleDropzone(this.dropEl, this.inputEl);
-    dropCtrl.on('drop', ({files}) => this.load(files));
+    dropCtrl.on('drop', ({files}) => this.appload(files));
     dropCtrl.on('dropstart', () => this.showSpinner());
     dropCtrl.on('droperror', () => this.hideSpinner());
   }
@@ -73,6 +82,8 @@ class App {
     this.viewerEl.classList.add('viewer');
     this.dropEl.innerHTML = '';
     this.dropEl.appendChild(this.viewerEl);
+    console.log("-------->createViewer");
+    console.log(this.viewerEl);
     this.viewer = new Viewer(this.viewerEl, this.options);
     return this.viewer;
   }
@@ -81,21 +92,31 @@ class App {
    * Loads a fileset provided by user action.
    * @param  {Map<string, File>} fileMap
    */
-  load (fileMap) {
-    let rootFile;
-    let rootPath;
-    Array.from(fileMap).forEach(([path, file]) => {
-      if (file.name.match(/\.(gltf|glb)$/)) {
-        rootFile = file;
-        rootPath = path.replace(file.name, '');
+  //load (fileMap) {
+  appload (fileMap) {
+    console.log("------>load");
+    console.log(fileMap);
+    if(window.is_loadgltf_at_start==true){ //add by hao 
+      console.log("fileMap is null");
+      this.view("./model/tiny_house.glb", "", "");
+    }else{
+      let rootFile;
+      let rootPath;
+      Array.from(fileMap).forEach(([path, file]) => {
+        if (file.name.match(/\.(gltf|glb)$/)) {
+          
+          rootFile = file;
+          rootPath = path.replace(file.name, '');
+        }
+      });
+  
+      if (!rootFile) {
+        this.onError('No .gltf or .glb asset found.');
       }
-    });
-
-    if (!rootFile) {
-      this.onError('No .gltf or .glb asset found.');
+      console.log("load-------->rootFile:"+rootFile+",rootPath:"+rootPath+",fileMap:"+fileMap);
+      console.log(rootFile);
+      this.view(rootFile, rootPath, fileMap);
     }
-
-    this.view(rootFile, rootPath, fileMap);
   }
 
   /**
@@ -109,11 +130,16 @@ class App {
     if (this.viewer) this.viewer.clear();
 
     const viewer = this.viewer || this.createViewer();
+    
 
+    if(rootFile=="no_url"){
+
+    }
     const fileURL = typeof rootFile === 'string'
       ? rootFile
       : URL.createObjectURL(rootFile);
 
+    console.log("loadgltf.js fileURL:"+fileURL);
     const cleanup = () => {
       this.hideSpinner();
       if (typeof rootFile === 'object') URL.revokeObjectURL(fileURL);
@@ -124,6 +150,7 @@ class App {
       .catch((e) => this.onError(e))
       .then((gltf) => {
         if (!this.options.kiosk) {
+          console.log("viewr.load validate--->");
           this.validator.validate(fileURL, rootPath, fileMap, gltf);
         }
         cleanup();
@@ -160,7 +187,6 @@ document.body.innerHTML += Footer();
 document.addEventListener('DOMContentLoaded', () => {
 
   const app = new App(document.body, location);
-
   window.VIEWER.app = app;
 
   console.info('[glTF Viewer] Debugging data exported as `window.VIEWER`.');

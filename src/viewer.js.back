@@ -180,10 +180,15 @@ export class Viewer {
 
   load ( url, rootPath, assetMap ) {
 
+    // if(url="no_url"){
+    //   url="./model/tiny_house.glb";
+    // }
     const baseURL = LoaderUtils.extractUrlBase(url);
     console.log("from viewer.js----->");
     console.log("from viewer.js----->url:"+url);
     // Load.
+    //add by hao 改了这里 就可以直接加载指定的模型了
+     
     return new Promise((resolve, reject) => {
 
       // Intercept and override relative URLs.
@@ -196,8 +201,7 @@ export class Viewer {
           .replace(baseURL, '')
           .replace(/^(\.?\/)/, '');
 
-        //if (assetMap.has(normalizedURL)) {
-        if (assetMap!="" && assetMap.has(normalizedURL)) {//modify by hao
+        if (assetMap!="" && assetMap.has(normalizedURL)) {
           const blob = assetMap.get(normalizedURL);
           const blobURL = URL.createObjectURL(blob);
           blobURLs.push(blobURL);
@@ -215,8 +219,8 @@ export class Viewer {
         .setMeshoptDecoder( MeshoptDecoder );
 
       const blobURLs = [];
-      //add by hao 改了这里 就可以直接加载指定的模型了
-      //url="./model/tiny_house.glb";
+      
+
       loader.load(url, (gltf) => {
 
         console.log("from viewer.js loader.load----->"+url);
