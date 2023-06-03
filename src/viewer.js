@@ -167,7 +167,7 @@ export class Viewer {
   }
 
   resize () {
-
+    console.log("resize----->");
     const {clientHeight, clientWidth} = this.el.parentElement;
 
     this.defaultCamera.aspect = clientWidth / clientHeight;
@@ -320,7 +320,7 @@ export class Viewer {
 
     window.VIEWER.scene = this.content;
 
-    this.printGraph(this.content);
+    //this.printGraph(this.content);
 
   }
 
@@ -470,6 +470,7 @@ export class Viewer {
   }
 
   updateDisplay () {
+    console.log("updateDisplay---------->");
     if (this.skeletonHelpers.length) {
       this.skeletonHelpers.forEach((helper) => this.scene.remove(helper));
     }
@@ -543,7 +544,7 @@ export class Viewer {
     const gui = this.gui = new GUI({autoPlace: false, width: 260, hideable: true});
 
     // Display controls.
-    const dispFolder = gui.addFolder('Display');
+    const dispFolder = gui.addFolder('Display----haohao ');
     const envBackgroundCtrl = dispFolder.add(this.state, 'background');
     envBackgroundCtrl.onChange(() => this.updateEnvironment());
     const wireframeCtrl = dispFolder.add(this.state, 'wireframe');
@@ -725,6 +726,7 @@ function traverseMaterials (object, callback) {
 
 // https://stackoverflow.com/a/9039885/1314762
 function isIOS() {
+  console.log("----isIOS---->");
   return [
     'iPad Simulator',
     'iPhone Simulator',
