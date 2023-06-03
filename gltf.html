@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>gltf.html</title>
+<script type="module">
+//import * as THREE from 'three';
+import {
+  AmbientLight,
+  AnimationMixer,
+  AxesHelper,
+  Box3,
+  Cache,
+  Color,
+  DirectionalLight,
+  GridHelper,
+  HemisphereLight,
+  LoaderUtils,
+  LoadingManager,
+  PMREMGenerator,
+  PerspectiveCamera,
+  REVISION,
+  Scene,
+  SkeletonHelper,
+  Vector3,
+  WebGLRenderer,
+  sRGBEncoding,
+  LinearToneMapping,
+  ACESFilmicToneMapping
+} from 'three';
+import queryString from 'query-string';
+
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+// import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
+// import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+// import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+
+// const MANAGER = new LoadingManager();
+// const THREE_PATH = `https://unpkg.com/three@0.${REVISION}.x`
+// const DRACO_LOADER = new DRACOLoader( MANAGER ).setDecoderPath( `${THREE_PATH}/examples/jsm/libs/draco/gltf/` );
+// const KTX2_LOADER = new KTX2Loader( MANAGER ).setTranscoderPath( `${THREE_PATH}/examples/jsm/libs/basis/` );
+
+//add by hao -----begin---------->
+const hash = location.hash ? queryString.parse(location.hash) : {};
+const options = {
+      kiosk: Boolean(hash.kiosk),
+      model: hash.model || '',
+      preset: hash.preset || '',
+      cameraPosition: hash.cameraPosition
+        ? hash.cameraPosition.split(',').map(Number)
+        : null
+    };
+//const DEFAULT_CAMERA = '[default]';
+const state = {
+      // environment: options.preset === Preset.ASSET_GENERATOR
+      //   ? environments.find((e) => e.id === 'footprint-court').name
+      //   : environments[1].name,
+      background: false,
+      playbackSpeed: 1.0,
+      actionStates: {},
+      //camera: DEFAULT_CAMERA,
+      wireframe: false,
+      skeleton: false,
+      grid: false,
+
+      // Lights
+      punctualLights: true,
+      exposure: 0.0,
+      toneMapping: LinearToneMapping,
+      ambientIntensity: 0.3,
+      ambientColor: 0xFFFFFF,
+      directIntensity: 0.8 * Math.PI, // TODO(#116)
+      directColor: 0xFFFFFF,
+      bgColor: 0x191919,
+};
+ 
+  function addAxesHelper (defaultCamera) {
+    const axesDiv = document.createElement('div');
+    const el= document.body;
+    el.appendChild(  axesDiv );
+    axesDiv.classList.add('axes');
+
+    const {clientWidth, clientHeight} =  axesDiv;
+
+    const axesScene = new Scene();
+    const axesCamera = new PerspectiveCamera( 50, clientWidth / clientHeight, 0.1, 10 );
+    axesScene.add( axesCamera );
+
+    const axesRenderer = new WebGLRenderer( { alpha: true } );
+    axesRenderer.setPixelRatio( window.devicePixelRatio );
+    axesRenderer.setSize(  axesDiv.clientWidth, axesDiv.clientHeight );
+
+    axesCamera.up =  defaultCamera.up;
+
+    const axesCorner = new AxesHelper(5);
+    axesScene.add( axesCorner );
+    axesDiv.appendChild(axesRenderer.domElement);
+  }
+//add by hao -----end---------->
+
+const camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+//addAxesHelper (camera);
+camera.position.x = 150;
+camera.position.z = 200;
+camera.position.y= 100;
+// 创建渲染器
+const renderer =new WebGLRenderer( { alpha: true,antialias: true,precision: 'highp'} );
+renderer.useLegacyLights = false;
+renderer.outputEncoding = sRGBEncoding;
+renderer.setClearColor( 0xcccccc );
+renderer.setPixelRatio( window.devicePixelRatio );
+renderer.setSize( window.innerWidth, window.innerHeight );
+renderer.toneMapping = Number(state.toneMapping);
+renderer.toneMappingExposure = Math.pow(2, state.exposure);
+const pmremGenerator = new PMREMGenerator( renderer );
+pmremGenerator.compileEquirectangularShader();
+
+const neutralEnvironment =  pmremGenerator.fromScene( new RoomEnvironment() ).texture;
+
+
+document.body.appendChild( renderer.domElement );
+// 创建场景
+const scene = new Scene();
+//scene.background = new Color(0xeaeaea);
+scene.background = new Color(0x191919);
+
+// 添加灯光
+const light1  = new AmbientLight(0xFFFFFF, 0.3);
+light1.name = 'ambient_light';
+camera.add( light1 );
+
+const light2  = new DirectionalLight(0xFFFFFF, 0.8 * Math.PI);
+light2.position.set(0.5, 0, 0.866); // ~60º
+light2.name = 'main_light';
+camera.add( light2 );
+const hemiLight = new HemisphereLight();
+hemiLight.name = 'hemi_light';
+camera.add(hemiLight);
+
+
+scene.add(camera );
+//const envMap=neutralEnvironment;
+scene.environment = neutralEnvironment;//envMap;
+//scene.background = state.background ? envMap : '0x191919';
+
+
+// 添加控制器
+//new OrbitControls(camera, document.body);
+//new OrbitControls(camera, renderer.domElement );
+const controls = new OrbitControls( camera, renderer.domElement );
+controls.screenSpacePanning = true;
+
+function animate() {
+    requestAnimationFrame( animate );
+    renderer.render( scene, camera );
+}
+animate();
+const loader = new GLTFLoader();
+// const loader = new GLTFLoader()
+//         .setCrossOrigin('anonymous')
+//         .setDRACOLoader( DRACO_LOADER )
+//         .setKTX2Loader( KTX2_LOADER.detectSupport( renderer ) )
+//         .setMeshoptDecoder( MeshoptDecoder );
+loader.load("./model/tiny_house.glb", (gltf) => {
+//loader.load("./model/new_witch_naked.glb", (gltf) => {
+    gltf.scene.scale.set(0.2, 0.2, 0.2);
+    scene.add(gltf.scene);
+});	
+</script>
+  </head>
+  <body>
+	this is three-gltf-viewer
+  </body>
+</html>

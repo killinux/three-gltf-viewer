@@ -156,9 +156,10 @@ export class Viewer {
   }
 
   render () {
-
+    //console.log("render---->");
     this.renderer.render( this.scene, this.activeCamera );
     if (this.state.grid) {
+      console.log("render---->grid is true");
       this.axesCamera.position.copy(this.defaultCamera.position)
       this.axesCamera.lookAt(this.axesScene.position)
       this.axesRenderer.render( this.axesScene, this.axesCamera );
@@ -206,7 +207,7 @@ export class Viewer {
         return (path || '') + url;
 
       });
-
+      console.log("from view --->>>>>");
       const loader = new GLTFLoader( MANAGER )
         .setCrossOrigin('anonymous')
         .setDRACOLoader( DRACO_LOADER )
@@ -254,8 +255,8 @@ export class Viewer {
 
     this.clear();
 
-    object.updateMatrixWorld(); // donmccurdy/three-gltf-viewer#330
-    
+    //object.updateMatrixWorld(); // donmccurdy/three-gltf-viewer#330
+    console.log("------setContent---->");
     const box = new Box3().setFromObject(object);
     const size = box.getSize(new Vector3()).length();
     const center = box.getCenter(new Vector3());
@@ -440,7 +441,7 @@ export class Viewer {
 
     // neutral (THREE.RoomEnvironment)
     if ( id === 'neutral' ) {
-
+      console.log("EXRLoader------>neutral");
       return Promise.resolve( { envMap: this.neutralEnvironment } );
 
     }
@@ -453,7 +454,7 @@ export class Viewer {
     }
 
     return new Promise( ( resolve, reject ) => {
-
+      console.log("EXRLoader------>");
       new EXRLoader()
         .load( path, ( texture ) => {
 
