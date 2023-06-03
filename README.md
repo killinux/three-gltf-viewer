@@ -1,6 +1,10 @@
 
 add by hao 
 get gltf from https://sketchfab.com/
+清晰度都是render决定的，要把这部分仔细看下  
+https://blog.csdn.net/yy729851376/article/details/124399415
+
+另外，用webgpu的render会不会更清晰?
 
 file---> blob --->url
 需要验证下这个
