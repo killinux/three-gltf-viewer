@@ -1,0 +1,88 @@
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>simple</title>
+<script type="module">
+import {
+  AmbientLight,
+  AnimationMixer,
+  AxesHelper,
+  Box3,
+  Cache,
+  Color,
+  DirectionalLight,
+  GridHelper,
+  HemisphereLight,
+  LoaderUtils,
+  LoadingManager,
+  PMREMGenerator,
+  PerspectiveCamera,
+  REVISION,
+  Scene,
+  SkeletonHelper,
+  Vector3,
+  WebGLRenderer,
+  sRGBEncoding,
+  LinearToneMapping,
+  ACESFilmicToneMapping
+} from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+//创建摄像头
+const camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.x = 150;
+camera.position.z = 50;
+camera.position.y= 100;
+// 创建渲染器
+// const renderer = new THREE.WebGLRenderer();
+// renderer.setSize( window.innerWidth, window.innerHeight );
+const renderer =new WebGLRenderer( { alpha: true,antialias: true,precision: 'highp'} );
+renderer.useLegacyLights = false;
+renderer.outputEncoding = sRGBEncoding;
+renderer.setClearColor( 0xcccccc );
+renderer.setPixelRatio( window.devicePixelRatio );
+renderer.setSize( window.innerWidth, window.innerHeight );
+renderer.toneMapping = Number(LinearToneMapping);
+renderer.toneMappingExposure = Math.pow(2, 0.0);
+const pmremGenerator = new PMREMGenerator( renderer );
+pmremGenerator.compileEquirectangularShader();
+const neutralEnvironment =  pmremGenerator.fromScene( new RoomEnvironment() ).texture;
+
+document.body.appendChild( renderer.domElement );
+// 创建场景
+const scene = new Scene();
+scene.background = new Color(0xeaeaea);
+// 添加灯光
+const light1  = new AmbientLight(0xFFFFFF, 0.3);
+light1.name = 'ambient_light';
+camera.add( light1 );
+const light2  = new DirectionalLight(0xFFFFFF, 0.8 * Math.PI);
+light2.position.set(0.5, 0, 0.866); // ~60º
+light2.name = 'main_light';
+camera.add( light2 );
+const hemiLight = new HemisphereLight();
+hemiLight.name = 'hemi_light';
+camera.add(hemiLight);
+scene.add(camera);
+scene.environment = neutralEnvironment;
+scene.background = new Color(0x191919);
+// 添加控制器
+new OrbitControls(camera, document.body);
+
+function animate() {
+    requestAnimationFrame( animate );
+    renderer.render( scene, camera );
+}
+animate();
+const loader = new GLTFLoader();
+loader.load('./model/tiny_house.glb', (gltf) => {
+//loader.load('./model/tree.gltf', (gltf) => {
+    gltf.scene.scale.set(0.2, 0.2, 0.2);
+    scene.add(gltf.scene);
+});	
+</script>
+  </head>
+  <body>
+  </body>
+</html>

@@ -1,0 +1,637 @@
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="author" content="Don McCurdy">
+    <meta name="description" content="Drag-and-drop preview tool for glTF 2.0 3D models.">
+    <link rel="canonical" href="https://gltf-viewer.donmccurdy.com/">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css?family=Raleway:300,400" rel="stylesheet">    
+<script defer type="module">
+import {
+  AmbientLight,
+  AnimationMixer,
+  AxesHelper,
+  Box3,
+  Cache,
+  Color,
+  DirectionalLight,
+  GridHelper,
+  HemisphereLight,
+  LoaderUtils,
+  LoadingManager,
+  PMREMGenerator,
+  PerspectiveCamera,
+  REVISION,
+  Scene,
+  SkeletonHelper,
+  Vector3,
+  WebGLRenderer,
+  sRGBEncoding,
+  LinearToneMapping,
+  ACESFilmicToneMapping
+} from 'three';
+import Stats from 'three/examples/jsm/libs/stats.module.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+// import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
+// import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+// import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+// import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { GUI } from 'dat.gui';
+
+import { environments } from './src/environments.js';
+
+const DEFAULT_CAMERA = '[default]';
+import queryString from 'query-string';
+
+const MANAGER = new LoadingManager();
+const THREE_PATH = `https://unpkg.com/three@0.${REVISION}.x`
+// const DRACO_LOADER = new DRACOLoader( MANAGER ).setDecoderPath( `${THREE_PATH}/examples/jsm/libs/draco/gltf/` );
+// const KTX2_LOADER = new KTX2Loader( MANAGER ).setTranscoderPath( `${THREE_PATH}/examples/jsm/libs/basis/` );
+
+const Preset = {ASSET_GENERATOR: 'assetgenerator'};
+//const IS_IOS = isIOS();
+//add by hao ------>begin------
+window.VIEWER = {};
+export class Viewer {
+  constructor (el, options) {
+    this.el = el;
+    this.options = options;
+    this.lights = [];
+    this.content = null;
+    this.mixer = null;
+    this.clips = [];
+    this.gui = null;
+
+    
+    const hash = location.hash ? queryString.parse(location.hash) : {};
+
+    this.scene = new Scene();
+    this.scene.background = this.backgroundColor;
+    const fov = options.preset === Preset.ASSET_GENERATOR
+      ? 0.8 * 180 / Math.PI
+      : 60;
+    this.defaultCamera = new PerspectiveCamera( fov, el.clientWidth / el.clientHeight, 0.01, 1000 );
+    this.activeCamera = this.defaultCamera;
+    this.scene.add( this.defaultCamera );
+
+    this.renderer = window.renderer = new WebGLRenderer({antialias: true});
+    this.renderer.useLegacyLights = false;
+    this.renderer.outputEncoding = sRGBEncoding;
+    this.renderer.setClearColor( 0xcccccc );
+    this.renderer.setPixelRatio( window.devicePixelRatio );
+    this.renderer.setSize( el.clientWidth, el.clientHeight );
+
+    this.pmremGenerator = new PMREMGenerator( this.renderer );
+    this.pmremGenerator.compileEquirectangularShader();
+
+    this.neutralEnvironment = this.pmremGenerator.fromScene( new RoomEnvironment() ).texture;
+
+    this.controls = new OrbitControls( this.defaultCamera, this.renderer.domElement );
+    this.controls.screenSpacePanning = true;
+
+    this.el.appendChild(this.renderer.domElement);//haohao
+
+    console.log("Viewer constructor---->"+options.preset);
+    this.state = {
+      environment: options.preset === Preset.ASSET_GENERATOR
+        ? environments.find((e) => e.id === 'footprint-court').name
+        : environments[1].name,
+      background: false,
+      playbackSpeed: 1.0,
+      actionStates: {},
+      camera: DEFAULT_CAMERA,
+      wireframe: false,
+      skeleton: false,
+      grid: false,
+
+      // Lights
+      punctualLights: true,
+      exposure: 0.0,
+      toneMapping: LinearToneMapping,
+      ambientIntensity: 0.3,
+      ambientColor: 0xFFFFFF,
+      directIntensity: 0.8 * Math.PI, // TODO(#116)
+      directColor: 0xFFFFFF,
+      bgColor: 0x191919,
+    };
+
+    this.stats = new Stats();
+    this.stats.dom.height = '48px';
+
+    this.addGUI();
+    //if (options.kiosk) this.gui.close();
+
+    this.animate = this.animate.bind(this);
+    requestAnimationFrame( this.animate );
+    //window.addEventListener('resize', this.resize.bind(this), false);
+  }
+  animate (time) {
+  
+    requestAnimationFrame( this.animate );
+
+    const dt = (time - this.prevTime) / 1000;
+
+    this.controls.update();
+    this.stats.update();
+    this.mixer && this.mixer.update(dt);
+    this.render();
+
+    this.prevTime = time;
+
+  }
+  getCubeMapTexture ( environment ) {
+    const { id, path } = environment;
+
+    // neutral (THREE.RoomEnvironment)
+    if ( id === 'neutral' ) {
+      console.log("EXRLoader------>neutral");
+      return Promise.resolve( { envMap: this.neutralEnvironment } );
+
+    }
+
+    // none
+    if ( id === '' ) {
+
+      return Promise.resolve( { envMap: null } );
+
+    }
+
+    return new Promise( ( resolve, reject ) => {
+      console.log("EXRLoader------>");
+      new EXRLoader()
+        .load( path, ( texture ) => {
+
+          const envMap = this.pmremGenerator.fromEquirectangular( texture ).texture;
+          this.pmremGenerator.dispose();
+
+          resolve( { envMap } );
+
+        }, undefined, reject );
+
+    });
+
+  }
+  render () {
+    //console.log("render---->");
+    this.renderer.render( this.scene, this.activeCamera );
+    if (this.state.grid) {
+      console.log("render---->grid is true");
+      this.axesCamera.position.copy(this.defaultCamera.position)
+      this.axesCamera.lookAt(this.axesScene.position)
+      this.axesRenderer.render( this.axesScene, this.axesCamera );
+    }
+  }
+  updateEnvironment () {
+    const environment = environments.filter((entry) => entry.name === this.state.environment)[0];
+    this.getCubeMapTexture( environment ).then(( { envMap } ) => {
+      this.scene.environment = envMap;
+      this.scene.background = this.state.background ? envMap : this.backgroundColor;
+
+    });
+
+  }
+  setContent ( object, clips ) {
+    
+    //this.clear();
+
+    object.updateMatrixWorld(); // donmccurdy/three-gltf-viewer#330
+    console.log("------setContent---->");
+    const box = new Box3().setFromObject(object);
+    const size = box.getSize(new Vector3()).length();
+    const center = box.getCenter(new Vector3());
+
+    this.controls.reset();
+
+    object.position.x += (object.position.x - center.x);
+    object.position.y += (object.position.y - center.y);
+    object.position.z += (object.position.z - center.z);
+    this.controls.maxDistance = size * 10;
+    this.defaultCamera.near = size / 100;
+    this.defaultCamera.far = size * 100;
+    this.defaultCamera.updateProjectionMatrix();
+
+    if (this.options.cameraPosition) {
+
+      this.defaultCamera.position.fromArray( this.options.cameraPosition );
+      this.defaultCamera.lookAt( new Vector3() );
+
+    } else {
+
+      this.defaultCamera.position.copy(center);
+      this.defaultCamera.position.x += size / 2.0;
+      this.defaultCamera.position.y += size / 5.0;
+      this.defaultCamera.position.z += size / 2.0;
+      this.defaultCamera.lookAt(center);
+
+    }
+
+    this.setCamera(DEFAULT_CAMERA);
+
+    // this.axesCamera.position.copy(this.defaultCamera.position)
+    // this.axesCamera.lookAt(this.axesScene.position)
+    // this.axesCamera.near = size / 100;
+    // this.axesCamera.far = size * 100;
+    // this.axesCamera.updateProjectionMatrix();
+    // this.axesCorner.scale.set(size, size, size);
+
+    this.controls.saveState();
+
+    this.scene.add(object);
+    this.content = object;
+
+    this.state.punctualLights = true;
+
+    this.content.traverse((node) => {
+      if (node.isLight) {
+        this.state.punctualLights = false;
+      } else if (node.isMesh) {
+        // TODO(https://github.com/mrdoob/three.js/pull/18235): Clean up.
+        node.material.depthWrite = !node.material.transparent;
+      }
+    });
+
+    // this.setClips(clips);
+
+    this.updateLights();
+    // this.updateGUI();
+    this.updateEnvironment();
+    //this.updateDisplay();
+
+    window.VIEWER.scene = this.content;
+
+    //this.printGraph(this.content);
+
+  }
+  setCamera ( name ) {
+    if (name === DEFAULT_CAMERA) {
+      this.controls.enabled = true;
+      this.activeCamera = this.defaultCamera;
+    } else {
+      this.controls.enabled = false;
+      this.content.traverse((node) => {
+        if (node.isCamera && node.name === name) {
+          this.activeCamera = node;
+        }
+      });
+    }
+  }
+  addLights () {
+    const state = this.state;
+
+    if (this.options.preset === Preset.ASSET_GENERATOR) {
+      const hemiLight = new HemisphereLight();
+      hemiLight.name = 'hemi_light';
+      this.scene.add(hemiLight);
+      this.lights.push(hemiLight);
+      return;
+    }
+
+    const light1  = new AmbientLight(state.ambientColor, state.ambientIntensity);
+    light1.name = 'ambient_light';
+    this.defaultCamera.add( light1 );
+
+    const light2  = new DirectionalLight(state.directColor, state.directIntensity);
+    light2.position.set(0.5, 0, 0.866); // ~60º
+    light2.name = 'main_light';
+    this.defaultCamera.add( light2 );
+
+    this.lights.push(light1, light2);
+  }
+  updateLights () {
+    const state = this.state;
+    const lights = this.lights;
+
+    if (state.punctualLights && !lights.length) {
+      this.addLights();
+    } else if (!state.punctualLights && lights.length) {
+      this.removeLights();
+    }
+
+    this.renderer.toneMapping = Number(state.toneMapping);
+    this.renderer.toneMappingExposure = Math.pow(2, state.exposure);
+
+    if (lights.length === 2) {
+      lights[0].intensity = state.ambientIntensity;
+      lights[0].color.setHex(state.ambientColor);
+      lights[1].intensity = state.directIntensity;
+      lights[1].color.setHex(state.directColor);
+    }
+  }
+  addAxesHelper () {
+    this.axesDiv = document.createElement('div');
+    this.el.appendChild( this.axesDiv );
+    this.axesDiv.classList.add('axes');
+
+    const {clientWidth, clientHeight} = this.axesDiv;
+
+    this.axesScene = new Scene();
+    this.axesCamera = new PerspectiveCamera( 50, clientWidth / clientHeight, 0.1, 10 );
+    this.axesScene.add( this.axesCamera );
+
+    this.axesRenderer = new WebGLRenderer( { alpha: true } );
+    this.axesRenderer.setPixelRatio( window.devicePixelRatio );
+    this.axesRenderer.setSize( this.axesDiv.clientWidth, this.axesDiv.clientHeight );
+
+    this.axesCamera.up = this.defaultCamera.up;
+
+    this.axesCorner = new AxesHelper(5);
+    this.axesScene.add( this.axesCorner );
+    this.axesDiv.appendChild(this.axesRenderer.domElement);
+  }
+  addGUI() {
+    const gui  = this.gui =new GUI({autoPlace: false, width: 260, hideable: true});
+    // Display controls.
+    const dispFolder = gui.addFolder('Display----haohao ');
+    const envBackgroundCtrl = dispFolder.add(this.state, 'background');
+    envBackgroundCtrl.onChange(() => this.updateEnvironment());
+    const wireframeCtrl = dispFolder.add(this.state, 'wireframe');
+    wireframeCtrl.onChange(() => this.updateDisplay());
+    const skeletonCtrl = dispFolder.add(this.state, 'skeleton');
+    skeletonCtrl.onChange(() => this.updateDisplay());
+    const gridCtrl = dispFolder.add(this.state, 'grid');
+    gridCtrl.onChange(() => this.updateDisplay());
+    dispFolder.add(this.controls, 'screenSpacePanning');
+    const bgColorCtrl = dispFolder.addColor(this.state, 'bgColor');
+    bgColorCtrl.onChange(() => this.updateBackground());
+
+    // Lighting controls.
+    const lightFolder = gui.addFolder('Lighting');
+    //const envMapCtrl = lightFolder.add(this.state, 'environment', environments.map((env) => env.name));
+    const envMapCtrl = lightFolder.add(this.state, 'environment', environments.map((env) => env.name));
+    envMapCtrl.onChange(() => this.updateEnvironment());
+    [
+      lightFolder.add(this.state, 'toneMapping', {Linear: LinearToneMapping, 'ACES Filmic': ACESFilmicToneMapping}),
+      lightFolder.add(this.state, 'exposure', -10, 10, 0.01),
+      lightFolder.add(this.state, 'punctualLights').listen(),
+      lightFolder.add(this.state, 'ambientIntensity', 0, 2),
+      lightFolder.addColor(this.state, 'ambientColor'),
+      lightFolder.add(this.state, 'directIntensity', 0, 4), // TODO(#116)
+      lightFolder.addColor(this.state, 'directColor')
+    ].forEach((ctrl) => ctrl.onChange(() => this.updateLights()));
+
+    // Animation controls.
+    this.animFolder = gui.addFolder('Animation');
+    this.animFolder.domElement.style.display = 'none';
+    const playbackSpeedCtrl = this.animFolder.add(this.state, 'playbackSpeed', 0, 1);
+    playbackSpeedCtrl.onChange((speed) => {
+      if (this.mixer) this.mixer.timeScale = speed;
+    });
+    this.animFolder.add({playAll: () => this.playAllClips()}, 'playAll');
+
+    // Morph target controls.
+    this.morphFolder = gui.addFolder('Morph Targets');
+    this.morphFolder.domElement.style.display = 'none';
+
+    // Camera controls.
+    this.cameraFolder = gui.addFolder('Cameras');
+    this.cameraFolder.domElement.style.display = 'none';
+
+    // Stats.
+    const perfFolder = gui.addFolder('Performance');
+    const perfLi = document.createElement('li');
+    this.stats.dom.style.position = 'static';
+    perfLi.appendChild(this.stats.dom);
+    perfLi.classList.add('gui-stats');
+    perfFolder.__ul.appendChild( perfLi );
+
+    const guiWrap = document.createElement('div');
+    this.el.appendChild( guiWrap );
+    guiWrap.classList.add('gui-wrap');
+    guiWrap.appendChild(gui.domElement);
+    gui.open();
+  }
+  load ( url, rootPath, assetMap ) {
+
+const baseURL = LoaderUtils.extractUrlBase(url);
+//console.log("from viewer.js----->url:"+url);//add by hao
+// Load.
+return new Promise((resolve, reject) => {
+
+  // Intercept and override relative URLs.
+  MANAGER.setURLModifier((url, path) => {
+
+    // URIs in a glTF file may be escaped, or not. Assume that assetMap is
+    // from an un-escaped source, and decode all URIs before lookups.
+    // See: https://github.com/donmccurdy/three-gltf-viewer/issues/146
+    const normalizedURL = rootPath + decodeURI(url)
+      .replace(baseURL, '')
+      .replace(/^(\.?\/)/, '');
+
+    //if (assetMap.has(normalizedURL)) {
+    if (assetMap!="" && assetMap.has(normalizedURL)) {//modify by hao ，如果assetMap 为空就不需要往后走了
+      const blob = assetMap.get(normalizedURL);
+      const blobURL = URL.createObjectURL(blob);
+      blobURLs.push(blobURL);
+      return blobURL;
+    }
+
+    return (path || '') + url;
+
+  });
+  console.log("from view --->>>>>");
+  // const loader = new GLTFLoader( MANAGER )
+  //   .setCrossOrigin('anonymous')
+  //   .setDRACOLoader( DRACO_LOADER )
+  //   .setKTX2Loader( KTX2_LOADER.detectSupport( this.renderer ) )
+  //   .setMeshoptDecoder( MeshoptDecoder );
+  const loader = new GLTFLoader();
+  const blobURLs = [];
+  //add by hao 改了这里 就可以直接加载指定的模型了
+  //url="./model/tiny_house.glb";
+  loader.load(url, (gltf) => {
+    //console.log("from viewer.js loader.load----->"+url);//add by hao
+    window.VIEWER.json = gltf;
+    const scene = gltf.scene || gltf.scenes[0];
+    const clips = gltf.animations || [];
+    if (!scene) {
+      // Valid, but not supported by this viewer.
+      throw new Error(
+        'This model contains no scene, and cannot be viewed here. However,'
+        + ' it may contain individual 3D resources.'
+      );
+    }
+    this.setContent(scene, clips);
+    blobURLs.forEach(URL.revokeObjectURL);
+    resolve(gltf);
+  }, undefined, reject);
+
+});
+
+}
+}
+class App {
+  constructor (el, location) {
+    console.log("app constructor--->");
+    console.log(location);
+    
+    const hash = location.hash ? queryString.parse(location.hash) : {};
+    this.options = {
+      kiosk: Boolean(hash.kiosk),
+      model: hash.model || '',
+      preset: hash.preset || '',
+      cameraPosition: hash.cameraPosition
+        ? hash.cameraPosition.split(',').map(Number)
+        : null
+    };
+    this.el = el;
+    this.viewer = null;
+    this.viewerEl = null;
+    this.spinnerEl = el.querySelector('.spinner');
+    this.dropEl = el.querySelector('.dropzone');
+    this.inputEl = el.querySelector('#file-input');
+    this.createDropzone();
+    this.hideSpinner();
+
+    const options = this.options;
+    console.log(options.model);
+    if (options.kiosk) {
+      const headerEl = document.querySelector('header');
+      headerEl.style.display = 'none';
+    }
+
+    if (options.model) {
+      console.log("model----->"+options.model);
+      this.view(options.model, '', new Map());
+    }
+  }
+  hideSpinner () {
+    this.spinnerEl.style.display = 'none';
+  }
+  createDropzone () {
+      this.appload("");
+    
+  }
+  createViewer () {
+    this.viewerEl = document.createElement('div');
+    this.viewerEl.classList.add('viewer');
+    this.dropEl.innerHTML = '';
+    this.dropEl.appendChild(this.viewerEl);
+    this.viewer = new Viewer(this.viewerEl, this.options);
+    return this.viewer;
+  }
+  appload (fileMap) {
+      const this_url="./model/tiny_house.glb";
+      console.log("from loadgltf.js, ----->appload, this_url:"+this_url);
+      this.view(this_url, "", "");
+  }
+  onError (error) {
+    let message = (error||{}).message || error.toString();
+    if (message.match(/ProgressEvent/)) {
+      message = 'Unable to retrieve this file. Check JS console and browser network tab.';
+    } else if (message.match(/Unexpected token/)) {
+      message = `Unable to parse file content. Verify that this file is valid. Error: "${message}"`;
+    } else if (error && error.target && error.target instanceof Image) {
+      message = 'Missing texture: ' + error.target.src.split('/').pop();
+    }
+    window.alert(message);
+    console.error(error);
+  }
+  view (rootFile, rootPath, fileMap) {
+    console.log("--view----->");
+    if (this.viewer) this.viewer.clear();
+    const viewer = this.viewer || this.createViewer();
+    const fileURL = typeof rootFile === 'string'
+      ? rootFile
+      : URL.createObjectURL(rootFile);
+    // const cleanup = () => {
+    //   this.hideSpinner();
+    //   if (typeof rootFile === 'object') URL.revokeObjectURL(fileURL);
+    // };
+    viewer
+      .load(fileURL, rootPath, fileMap)
+      .catch((e) => this.onError(e))
+      .then((gltf) => {
+        if (!this.options.kiosk) {
+          console.log("viewr.load validate--->error----->");
+          console.log(this.options);
+          //this.validator.validate(fileURL, rootPath, fileMap, gltf);
+        }
+        //cleanup();
+      });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  console.log("DOMContentLoaded-------->");
+  const app = new App(document.body, location);
+  window.VIEWER.app = app;
+  console.info('[glTF Viewer] Debugging data exported as `window.VIEWER`.');
+});
+
+//add by hao ------>end--------
+//创建摄像头
+// const camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+// camera.position.x = 150;
+// camera.position.z = 50;
+// camera.position.y= 100;
+/*创建渲染器
+const renderer =new WebGLRenderer( { alpha: true,antialias: true,precision: 'highp'} );
+renderer.useLegacyLights = false;
+renderer.outputEncoding = sRGBEncoding;
+renderer.setClearColor( 0xcccccc );
+renderer.setPixelRatio( window.devicePixelRatio );
+renderer.setSize( window.innerWidth, window.innerHeight );
+renderer.toneMapping = Number(LinearToneMapping);
+renderer.toneMappingExposure = Math.pow(2, 0.0);
+const pmremGenerator = new PMREMGenerator( renderer );
+pmremGenerator.compileEquirectangularShader();
+const neutralEnvironment =  pmremGenerator.fromScene( new RoomEnvironment() ).texture;
+
+document.body.appendChild( renderer.domElement );
+// 创建场景
+const scene = new Scene();
+scene.background = new Color(0xeaeaea);
+// 添加灯光
+const light1  = new AmbientLight(0xFFFFFF, 0.3);
+light1.name = 'ambient_light';
+camera.add( light1 );
+const light2  = new DirectionalLight(0xFFFFFF, 0.8 * Math.PI);
+light2.position.set(0.5, 0, 0.866); // ~60º
+light2.name = 'main_light';
+camera.add( light2 );
+const hemiLight = new HemisphereLight();
+hemiLight.name = 'hemi_light';
+camera.add(hemiLight);
+scene.add(camera);
+scene.environment = neutralEnvironment;
+scene.background = new Color(0x191919);
+// 添加控制器
+new OrbitControls(camera, document.body);
+
+function animate() {
+    requestAnimationFrame( animate );
+    renderer.render( scene, camera );
+}
+animate();
+const loader = new GLTFLoader();
+loader.load('./model/tiny_house.glb', (gltf) => {
+//loader.load('./model/tree.gltf', (gltf) => {
+    gltf.scene.scale.set(0.2, 0.2, 0.2);
+    scene.add(gltf.scene);
+});	
+*/
+</script>
+  </head>
+  <body>
+    <main class="wrap">
+      <div class="dropzone">
+        <div class="placeholder">
+          <p>Drag glTF 2.0 file or folder here</p>
+        </div>
+        <div class="upload-btn">
+          <input type="file" name="file-input[]" id="file-input" multiple="">
+          <label for="file-input">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="17" viewBox="0 0 20 17"><path d="M10 0l-5.2 4.9h3.3v5.1h3.8v-5.1h3.3l-5.2-4.9zm9.3 11.5l-3.2-2.1h-2l3.4 2.6h-3.5c-.1 0-.2.1-.2.1l-.8 2.3h-6l-.8-2.2c-.1-.1-.1-.2-.2-.2h-3.6l3.4-2.6h-2l-3.2 2.1c-.4.3-.7 1-.6 1.5l.6 3.1c.1.5.7.9 1.2.9h16.3c.6 0 1.1-.4 1.3-.9l.6-3.1c.1-.5-.2-1.2-.7-1.5z"></path></svg>
+            <span>Choose file</span>
+          </label>
+        </div>
+      </div>
+      <div class="spinner"></div>
+    </main>
+  </body>
+</html>

@@ -11,7 +11,7 @@ if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
 }
 class App {
   constructor (el, location) {
-    console.log("constructor--->");
+    console.log("app constructor--->");
     console.log(location);
     
     const hash = location.hash ? queryString.parse(location.hash) : {};

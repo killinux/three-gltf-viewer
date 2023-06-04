@@ -2,7 +2,6 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>yennefer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="author" content="Don McCurdy">
     <meta name="description" content="Drag-and-drop preview tool for glTF 2.0 3D models.">
@@ -230,7 +229,6 @@ renderer.toneMapping = Number(state.toneMapping);
 renderer.toneMappingExposure = Math.pow(2, state.exposure);
 const pmremGenerator = new PMREMGenerator( renderer );
 pmremGenerator.compileEquirectangularShader();
-
 const neutralEnvironment =  pmremGenerator.fromScene( new RoomEnvironment() ).texture;
 
 
@@ -282,7 +280,7 @@ const loader = new GLTFLoader();
   loader.load("./model/tiny_house.glb", (gltf) => {
   //loader.load("./model/new_witch_naked.glb", (gltf) => {
       // gltf.scene.scale.set(0.2, 0.2, 0.2);
-      // scene.add(gltf.scene);
+      //  scene.add(gltf.scene);
 
       const scene = gltf.scene || gltf.scenes[0];
       const clips = gltf.animations || [];
