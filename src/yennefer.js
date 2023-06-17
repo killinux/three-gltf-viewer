@@ -59,8 +59,8 @@ class App {
   }
   appload (fileMap) {
     if(window.is_loadgltf_at_start==true){ //add by hao 
-      const this_url="./model/tiny_house.glb";
-      //const this_url="./model/new_witch_naked.glb";
+      //const this_url="./model/tiny_house.glb";
+      const this_url="./model/new_witch_naked.glb";
       console.log("from loadgltf.js, ----->appload, this_url:"+this_url);
       this.view(this_url, "", "");
     }
